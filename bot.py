@@ -5,7 +5,7 @@ import threading
 from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from spluspy import Robot, Button
+from spluspy import Robot, Button, filters
 
 TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PORT = int(os.getenv("PORT", "10000"))
@@ -293,20 +293,65 @@ def start_health():
 
 bot=Robot(TOKEN)
 
+async def reply_safe(event, text_value, buttons=None):
+    reply_fn = getattr(event, "reply", None)
+    if not callable(reply_fn):
+        message_obj = getattr(event, "message", None)
+        reply_fn = getattr(message_obj, "reply", None)
+    if not callable(reply_fn):
+        raise RuntimeError("SplusPy event has no reply() method.")
+    if buttons is not None:
+        try:
+            return await reply_fn(text_value, buttons=buttons)
+        except TypeError:
+            return await reply_fn(text_value)
+    return await reply_fn(text_value)
+
+@bot.on_message(filters.text("/start"))
+async def start_handler(client, event):
+    try:
+        msg = getattr(event, "message", event)
+        uid_value = getattr(event, "sender_id", None) or getattr(msg, "sender_id", None)
+        chat_value = getattr(event, "chat_id", None) or getattr(msg, "chat_id", None)
+        uid = str(uid_value)
+        chat_id = str(chat_value)
+        print(f"T3R0ZA incoming /start uid={uid} chat={chat_id}")
+        ensure_user(uid)
+        add_xp(uid, 5)
+        await reply_safe(event, home(uid), MAIN)
+    except Exception as exc:
+        print(f"T3R0ZA /start error: {type(exc).__name__}: {exc}")
+        try:
+            await reply_safe(event, "⚡ T3R0ZA آنلاین شد؛ یه خطای موقت در منوی اصلی خوردیم.")
+        except Exception as reply_exc:
+            print(f"T3R0ZA /start reply error: {type(reply_exc).__name__}: {reply_exc}")
+
 @bot.on_message()
 async def handler(client,event):
     try:
-        message=event.message
-        text=(message.raw_text or message.text or "").strip()
-        if not text: return
-        uid=str(message.sender_id)
-        chat_id=str(message.chat_id)
+        message=getattr(event, "message", event)
+        text_value = (
+            getattr(event, "raw_text", None)
+            or getattr(event, "text", None)
+            or getattr(message, "raw_text", None)
+            or getattr(message, "text", None)
+            or getattr(message, "message", None)
+            or ""
+        )
+        text = str(text_value).strip()
+        if not text:
+            return
+        uid_value = getattr(event, "sender_id", None) or getattr(message, "sender_id", None)
+        chat_value = getattr(event, "chat_id", None) or getattr(message, "chat_id", None)
+        uid=str(uid_value)
+        chat_id=str(chat_value)
+        print(f"T3R0ZA incoming text={text!r} uid={uid} chat={chat_id}")
         ensure_user(uid)
         n=norm(text)
 
         if n in {"/start","شروع","استارت"}:
             add_xp(uid,5)
-            await event.reply(home(uid),buttons=MAIN)
+            await reply_safe(event, home(uid),buttons=MAIN)
             return
 
         active_key=(uid,chat_id)
