@@ -23,6 +23,8 @@ games = GameEngine(db)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+pending_game = {}
+
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -36,7 +38,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 def start_health_server():
     HTTPServer(("0.0.0.0", PORT), HealthHandler).serve_forever()
 
-def kb(rows):
+def keyboard(rows):
     builder = ReplyKeyboardBuilder()
     for row in rows:
         for label in row:
@@ -44,7 +46,7 @@ def kb(rows):
         builder.adjust(len(row))
     return builder.as_markup()
 
-MAIN_KB = kb([
+MAIN_KB = keyboard([
     ["🎮 بازی‌ها", "🪙 سکه"],
     ["🎁 جایزه", "🎯 مأموریت"],
     ["🛒 فروشگاه", "🎒 کوله‌بری"],
@@ -52,33 +54,85 @@ MAIN_KB = kb([
     ["🤝 دوستان / زوج", "⚙️ تنظیمات"],
 ])
 
-GAMES_KB = kb([
-    ["👤 تک‌نفره", "🧩 حدس کلمه"],
+GAMES_KB = keyboard([
+    ["🎯 کوئیز سریع"],
+    ["🧩 حدس کلمه"],
     ["⚡ تست واکنش"],
-    ["👥 دونفره", "👥👥 چندنفره"],
-    ["✅ پیوستن"],
     ["🏠 منو"],
 ])
 
-SHOP_KB = kb([
+MODES_KB = keyboard([
+    ["👤 تک‌نفره", "👥 دونفره"],
+    ["👥👥 چندنفره"],
+    ["🎮 بازی‌ها"],
+    ["🏠 منو"],
+])
+
+SHOP_KB = keyboard([
+    ["🧰 Lucky Badge", "🎨 Profile Frame"],
+    ["⚡ XP Boost"],
+    ["🏠 منو"],
+])
+
+SHOP_ACTION_KB = keyboard([
+    ["✅ خرید badge"],
+    ["✅ خرید frame"],
+    ["✅ خرید boost"],
     ["🛒 فروشگاه", "🎒 کوله‌بری"],
+])
+
+REWARD_KB = keyboard([
+    ["🎁 دریافت جایزه"],
+    ["🪙 سکه"],
     ["🏠 منو"],
 ])
 
-FRIENDS_KB = kb([
-    ["🤝 دوستان / زوج", "👤 پروفایل"],
-    ["🏠 منو"],
-])
+GAME_KIND_BY_TEXT = {
+    "🎯 کوئیز سریع": "solo_quiz",
+    "کوئیز سریع": "solo_quiz",
+    "🧩 حدس کلمه": "word_game",
+    "حدس کلمه": "word_game",
+    "⚡ تست واکنش": "reaction",
+    "تست واکنش": "reaction",
+}
 
-SETTINGS_KB = kb([
-    ["⚙️ تنظیمات", "🏠 منو"],
-])
+SHOP_KIND_BY_TEXT = {
+    "🧰 lucky badge": "badge",
+    "lucky badge": "badge",
+    "🧰 Lucky Badge".casefold(): "badge",
+    "🎨 profile frame": "frame",
+    "profile frame": "frame",
+    "🎨 Profile Frame".casefold(): "frame",
+    "⚡ xp boost": "boost",
+    "xp boost": "boost",
+    "⚡ XP Boost".casefold(): "boost",
+}
 
 def uid_of(message: Message):
     return str(message.from_user.id) if message.from_user else "unknown"
 
 def cid_of(message: Message):
     return str(message.chat.id) if message.chat else uid_of(message)
+
+async def reply(message: Message, text: str, markup=None):
+    await message.reply(str(text), reply_markup=markup or MAIN_KB)
+
+def mode_question(kind):
+    name = {
+        "solo_quiz": "🎯 کوئیز سریع",
+        "word_game": "🧩 حدس کلمه",
+        "reaction": "⚡ تست واکنش",
+    }[kind]
+    supported = {
+        "solo_quiz": "۱، ۲ یا چندنفره",
+        "word_game": "۱ یا ۲ نفره",
+        "reaction": "۱ یا ۲ نفره",
+    }[kind]
+    return (
+        f"{name} انتخاب شد ✅\n\n"
+        f"این بازی برای {supported} طراحی شده.\n"
+        "چند نفره می‌خوای بازی کنی؟"
+    )
 
 async def handle(message: Message):
     text = (message.text or "").strip()
@@ -92,59 +146,126 @@ async def handle(message: Message):
 
     normalized = db.normalize(text)
 
-    if normalized in {"/start", "شروع", "استارت"}:
-        db.mark_mission(uid, "login")
-        db.add_xp(uid, 5)
-        await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
-        return
-
+    # Answer an ongoing solo/room game first.
     active = games.answer_active(uid, cid, text)
     if active:
-        await message.answer(active, reply_markup=GAMES_KB)
+        pending_game.pop(uid, None)
+        await reply(message, active, GAMES_KB)
+        return
+
+    if normalized in {"/start", "شروع", "استارت"}:
+        pending_game.pop(uid, None)
+        db.mark_mission(uid, "login")
+        db.add_xp(uid, 5)
+        await reply(message, db.home_text(uid), MAIN_KB)
+        return
+
+    # When a game has been selected, the next message chooses its player count.
+    if uid in pending_game:
+        kind = pending_game[uid]
+        action, _ = db.parse_action(normalized)
+
+        if action == "mode_solo":
+            pending_game.pop(uid, None)
+            if kind == "solo_quiz" or kind == "word_game" or kind == "reaction":
+                await reply(message, games.start_solo(uid, cid, kind), GAMES_KB)
+            return
+
+        if action == "mode_duo":
+            if kind in {"word_game", "reaction", "solo_quiz"}:
+                pending_game.pop(uid, None)
+                await reply(
+                    message,
+                    games.create_room(uid, cid, "duo", kind),
+                    GAMES_KB,
+                )
+                return
+
+        if action == "mode_multi":
+            if kind != "solo_quiz":
+                await reply(
+                    message,
+                    "⚠️ این بازی چندنفره نیست.
+برای این بازی «تک‌نفره» یا «دونفره» رو انتخاب کن.",
+                    MODES_KB,
+                )
+                return
+            pending_game.pop(uid, None)
+            await reply(
+                message,
+                games.create_room(uid, cid, "multi", kind),
+                GAMES_KB,
+            )
+            return
+
+        if normalized in {"🏠 منو", "منو", "خانه"}:
+            pending_game.pop(uid, None)
+            await reply(message, db.home_text(uid), MAIN_KB)
+            return
+
+        # Ignore a new top-level command while a game mode is being selected only if it
+        # is not a menu command; otherwise allow normal routing below.
+
+    # Game catalog entry.
+    if normalized in {"🎮 بازی‌ها", "بازی", "گیم", "game", "games"}:
+        await reply(message, games.catalog_text(), GAMES_KB)
+        return
+
+    # Specific game entry.
+    game_key = text.casefold()
+    if game_key in GAME_KIND_BY_TEXT:
+        kind = GAME_KIND_BY_TEXT[game_key]
+        pending_game[uid] = kind
+        await reply(message, games.game_detail(kind) + "\n\n" + mode_question(kind), MODES_KB)
         return
 
     action, argument = db.parse_action(normalized)
 
     if action == "home":
-        await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
+        await reply(message, db.home_text(uid), MAIN_KB)
     elif action == "wallet":
-        await message.answer(db.wallet_text(uid), reply_markup=MAIN_KB)
+        await reply(message, db.wallet_text(uid), REWARD_KB)
     elif action == "reward":
-        await message.answer(db.claim_daily(uid), reply_markup=MAIN_KB)
+        await reply(message, db.claim_daily(uid), REWARD_KB)
+    elif normalized == "🎁 دریافت جایزه":
+        await reply(message, db.claim_daily(uid), REWARD_KB)
     elif action == "profile":
-        await message.answer(db.profile_text(uid), reply_markup=MAIN_KB)
+        await reply(message, db.profile_text(uid), MAIN_KB)
     elif action == "leaderboard":
-        await message.answer(db.leaderboard_text(), reply_markup=MAIN_KB)
+        await reply(message, db.leaderboard_text(), MAIN_KB)
     elif action == "missions":
-        await message.answer(db.missions_text(uid), reply_markup=MAIN_KB)
+        await reply(message, db.missions_text(uid), MAIN_KB)
     elif action == "shop":
-        await message.answer(db.shop_text(), reply_markup=SHOP_KB)
-    elif action == "buy":
-        await message.answer(db.buy_item(uid, argument), reply_markup=SHOP_KB)
+        await reply(message, db.shop_text(), SHOP_KB)
+    elif action == "shop_detail":
+        await reply(message, db.shop_detail(argument), SHOP_ACTION_KB)
     elif action == "inventory":
-        await message.answer(db.inventory_text(uid), reply_markup=SHOP_KB)
+        await reply(message, db.inventory_text(uid), SHOP_KB)
+    elif action == "buy":
+        await reply(message, db.buy_item(uid, argument), SHOP_KB)
     elif action == "friends":
-        await message.answer(db.friends_text(uid), reply_markup=FRIENDS_KB)
+        await reply(message, db.friends_text(uid), MAIN_KB)
     elif action == "pair":
-        await message.answer(db.pair_text(uid), reply_markup=FRIENDS_KB)
+        await reply(message, db.pair_text(uid), MAIN_KB)
     elif action == "pair_with":
-        await message.answer(db.pair_with(uid, argument), reply_markup=FRIENDS_KB)
+        await reply(message, db.pair_with(uid, argument), MAIN_KB)
     elif action == "settings":
-        await message.answer(db.settings_text(uid), reply_markup=SETTINGS_KB)
-    elif action == "games":
-        await message.answer(games.catalog_text(), reply_markup=GAMES_KB)
-    elif action in {"solo_quiz", "word_game", "reaction"}:
-        await message.answer(games.start_solo(uid, cid, action), reply_markup=GAMES_KB)
-    elif action == "duo":
-        await message.answer(games.create_room(uid, cid, "duo"), reply_markup=GAMES_KB)
-    elif action == "multiplayer":
-        await message.answer(games.create_room(uid, cid, "multi"), reply_markup=GAMES_KB)
+        await reply(message, db.settings_text(uid), MAIN_KB)
     elif action == "join":
-        await message.answer(games.join_room(uid, cid), reply_markup=GAMES_KB)
+        await reply(message, games.join_room(uid, cid), GAMES_KB)
+    elif action == "mode_solo" or action == "mode_duo" or action == "mode_multi":
+        await reply(
+            message,
+            "اول یک بازی رو انتخاب کن تا بعد تعداد نفراتش رو مشخص کنیم.",
+            GAMES_KB,
+        )
+    elif text.casefold() in SHOP_KIND_BY_TEXT:
+        item_id = SHOP_KIND_BY_TEXT[text.casefold()]
+        await reply(message, db.shop_detail(item_id), SHOP_ACTION_KB)
     elif action == "help":
-        await message.answer(db.help_text(), reply_markup=MAIN_KB)
+        await reply(message, db.help_text(), MAIN_KB)
     else:
-        await message.answer(db.suggest(text), reply_markup=MAIN_KB)
+        await reply(message, db.suggest(text), MAIN_KB)
 
 @dp.message(Command("start"))
 async def start_handler(message: Message):
@@ -154,11 +275,18 @@ async def start_handler(message: Message):
 async def menu_handler(message: Message):
     uid = uid_of(message)
     db.ensure_user(uid)
-    await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
+    await reply(message, db.home_text(uid), MAIN_KB)
 
 @dp.message()
 async def message_handler(message: Message):
-    await handle(message)
+    try:
+        await handle(message)
+    except Exception as exc:
+        print(f"T3R0ZA handler error: {type(exc).__name__}: {exc}")
+        try:
+            await reply(message, "⚠️ یه خطای موقت شد 😅\nدوباره همین گزینه رو بفرست.", MAIN_KB)
+        except Exception as reply_exc:
+            print(f"T3R0ZA reply error: {type(reply_exc).__name__}: {reply_exc}")
 
 async def main():
     me = await bot.get_me()
