@@ -31,3 +31,6 @@ BOT_TOKEN = توکن جدید ربات
 
 ## نکتهٔ دیتابیس
 SQLite در فایل محلی است. برای داده‌های مهم و استفادهٔ طولانی‌مدت، دیتابیس پایدار مثل PostgreSQL مناسب‌تر است.
+
+
+Release check for deployment syntax.
