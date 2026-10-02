@@ -1,19 +1,27 @@
 import os
+import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from spluspy import Robot
+from aiosplus import Bot, Dispatcher
+from aiosplus.filters import Command
+from aiosplus.types import Message
+from aiosplus.utils import ReplyKeyboardBuilder
 
 from database import Database
 from game_engine import GameEngine
-from menu import main_keyboard, games_keyboard, shop_keyboard, friends_keyboard, settings_keyboard
 
 TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PORT = int(os.getenv("PORT", "10000"))
 DB_PATH = os.getenv("DB_PATH", "data/t3r0za.sqlite3")
 
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN is not set in Render Environment Variables.")
+
 db = Database(DB_PATH)
 games = GameEngine(db)
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -26,137 +34,138 @@ class HealthHandler(BaseHTTPRequestHandler):
         return
 
 def start_health_server():
-    server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
-    server.serve_forever()
+    HTTPServer(("0.0.0.0", PORT), HealthHandler).serve_forever()
 
-threading.Thread(target=start_health_server, daemon=True).start()
+def kb(rows):
+    builder = ReplyKeyboardBuilder()
+    for row in rows:
+        for label in row:
+            builder.button(text=label)
+        builder.adjust(len(row))
+    return builder.as_markup()
 
-if not TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set. Add it in Render Environment Variables.")
+MAIN_KB = kb([
+    ["🎮 بازی‌ها", "🪙 سکه"],
+    ["🎁 جایزه", "🎯 مأموریت"],
+    ["🛒 فروشگاه", "🎒 کوله‌بری"],
+    ["👤 پروفایل", "🏆 رتبه"],
+    ["🤝 دوستان / زوج", "⚙️ تنظیمات"],
+])
 
-bot = Robot(TOKEN)
+GAMES_KB = kb([
+    ["👤 تک‌نفره", "🧩 حدس کلمه"],
+    ["⚡ تست واکنش"],
+    ["👥 دونفره", "👥👥 چندنفره"],
+    ["✅ پیوستن"],
+    ["🏠 منو"],
+])
 
-def _get_message(event):
-    return getattr(event, "message", None) or event
+SHOP_KB = kb([
+    ["🛒 فروشگاه", "🎒 کوله‌بری"],
+    ["🏠 منو"],
+])
 
-def _get_value(obj, names):
-    for name in names:
-        try:
-            value = getattr(obj, name, None)
-        except Exception:
-            value = None
-        if value not in (None, ""):
-            return value
-    return None
+FRIENDS_KB = kb([
+    ["🤝 دوستان / زوج", "👤 پروفایل"],
+    ["🏠 منو"],
+])
 
-def get_text(event):
-    msg = _get_message(event)
-    value = _get_value(msg, ("raw_text", "text", "message"))
-    if value is not None:
-        return str(value).strip()
-    value = _get_value(event, ("raw_text", "text", "message"))
-    return str(value).strip() if value is not None else ""
+SETTINGS_KB = kb([
+    ["⚙️ تنظیمات", "🏠 منو"],
+])
 
-def get_user_id(event):
-    msg = _get_message(event)
-    value = _get_value(msg, ("sender_id", "user_id"))
-    if value is None:
-        value = _get_value(event, ("sender_id", "user_id"))
-    return str(value) if value is not None else "unknown"
+def uid_of(message: Message):
+    return str(message.from_user.id) if message.from_user else "unknown"
 
-def get_chat_id(event):
-    msg = _get_message(event)
-    value = _get_value(msg, ("chat_id",))
-    if value is None:
-        value = _get_value(event, ("chat_id",))
-    return str(value) if value is not None else get_user_id(event)
+def cid_of(message: Message):
+    return str(message.chat.id) if message.chat else uid_of(message)
 
-async def send(event, text, keyboard=None):
-    if keyboard is None:
-        keyboard = main_keyboard()
-    target = event
-    reply = getattr(target, "reply", None)
-    if reply is None:
-        target = _get_message(event)
-        reply = getattr(target, "reply", None)
-    if reply is None:
-        raise RuntimeError("Incoming update has no reply() method.")
-    await reply(str(text), buttons=keyboard)
+async def handle(message: Message):
+    text = (message.text or "").strip()
+    if not text:
+        return
 
-@bot.on_message()
-async def on_message(client, event):
-    try:
-        text = get_text(event)
-        print(f"T3R0ZA incoming: {text!r}")
+    uid = uid_of(message)
+    cid = cid_of(message)
+    db.ensure_user(uid)
+    db.touch_user(uid)
 
-        if not text:
-            return
+    normalized = db.normalize(text)
 
-        uid = get_user_id(event)
-        cid = get_chat_id(event)
-        db.ensure_user(uid)
-        db.touch_user(uid)
-        normalized = db.normalize(text)
+    if normalized in {"/start", "شروع", "استارت"}:
+        db.mark_mission(uid, "login")
+        db.add_xp(uid, 5)
+        await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
+        return
 
-        if normalized in {"/start", "شروع", "استارت"}:
-            db.mark_mission(uid, "login")
-            db.add_xp(uid, 5)
-            await send(event, db.home_text(uid))
-            return
+    active = games.answer_active(uid, cid, text)
+    if active:
+        await message.answer(active, reply_markup=GAMES_KB)
+        return
 
-        active_result = games.answer_active(uid, cid, text)
-        if active_result:
-            await send(event, active_result, games_keyboard())
-            return
+    action, argument = db.parse_action(normalized)
 
-        action, argument = db.parse_action(normalized)
+    if action == "home":
+        await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
+    elif action == "wallet":
+        await message.answer(db.wallet_text(uid), reply_markup=MAIN_KB)
+    elif action == "reward":
+        await message.answer(db.claim_daily(uid), reply_markup=MAIN_KB)
+    elif action == "profile":
+        await message.answer(db.profile_text(uid), reply_markup=MAIN_KB)
+    elif action == "leaderboard":
+        await message.answer(db.leaderboard_text(), reply_markup=MAIN_KB)
+    elif action == "missions":
+        await message.answer(db.missions_text(uid), reply_markup=MAIN_KB)
+    elif action == "shop":
+        await message.answer(db.shop_text(), reply_markup=SHOP_KB)
+    elif action == "buy":
+        await message.answer(db.buy_item(uid, argument), reply_markup=SHOP_KB)
+    elif action == "inventory":
+        await message.answer(db.inventory_text(uid), reply_markup=SHOP_KB)
+    elif action == "friends":
+        await message.answer(db.friends_text(uid), reply_markup=FRIENDS_KB)
+    elif action == "pair":
+        await message.answer(db.pair_text(uid), reply_markup=FRIENDS_KB)
+    elif action == "pair_with":
+        await message.answer(db.pair_with(uid, argument), reply_markup=FRIENDS_KB)
+    elif action == "settings":
+        await message.answer(db.settings_text(uid), reply_markup=SETTINGS_KB)
+    elif action == "games":
+        await message.answer(games.catalog_text(), reply_markup=GAMES_KB)
+    elif action in {"solo_quiz", "word_game", "reaction"}:
+        await message.answer(games.start_solo(uid, cid, action), reply_markup=GAMES_KB)
+    elif action == "duo":
+        await message.answer(games.create_room(uid, cid, "duo"), reply_markup=GAMES_KB)
+    elif action == "multiplayer":
+        await message.answer(games.create_room(uid, cid, "multi"), reply_markup=GAMES_KB)
+    elif action == "join":
+        await message.answer(games.join_room(uid, cid), reply_markup=GAMES_KB)
+    elif action == "help":
+        await message.answer(db.help_text(), reply_markup=MAIN_KB)
+    else:
+        await message.answer(db.suggest(text), reply_markup=MAIN_KB)
 
-        if action == "home":
-            await send(event, db.home_text(uid))
-        elif action == "wallet":
-            await send(event, db.wallet_text(uid))
-        elif action == "reward":
-            await send(event, db.claim_daily(uid))
-        elif action == "profile":
-            await send(event, db.profile_text(uid))
-        elif action == "leaderboard":
-            await send(event, db.leaderboard_text())
-        elif action == "missions":
-            await send(event, db.missions_text(uid))
-        elif action == "shop":
-            await send(event, db.shop_text(), shop_keyboard())
-        elif action == "buy":
-            await send(event, db.buy_item(uid, argument), shop_keyboard())
-        elif action == "inventory":
-            await send(event, db.inventory_text(uid))
-        elif action == "friends":
-            await send(event, db.friends_text(uid), friends_keyboard())
-        elif action == "pair":
-            await send(event, db.pair_text(uid), friends_keyboard())
-        elif action == "pair_with":
-            await send(event, db.pair_with(uid, argument), friends_keyboard())
-        elif action == "settings":
-            await send(event, db.settings_text(uid), settings_keyboard())
-        elif action == "games":
-            await send(event, games.catalog_text(), games_keyboard())
-        elif action in {"solo_quiz", "word_game", "reaction"}:
-            await send(event, games.start_solo(uid, cid, action), games_keyboard())
-        elif action == "duo":
-            await send(event, games.create_room(uid, cid, "duo"), games_keyboard())
-        elif action == "multiplayer":
-            await send(event, games.create_room(uid, cid, "multi"), games_keyboard())
-        elif action == "join":
-            await send(event, games.join_room(uid, cid), games_keyboard())
-        elif action == "help":
-            await send(event, db.help_text())
-        else:
-            await send(event, db.suggest(text))
-    except Exception as exc:
-        print(f"T3R0ZA update error: {type(exc).__name__}: {exc}")
-        try:
-            await send(event, "⚠️ یه خطای موقت پیش اومد 😅\nدوباره /start رو بفرست.")
-        except Exception as reply_exc:
-            print(f"T3R0ZA reply error: {type(reply_exc).__name__}: {reply_exc}")
+@dp.message(Command("start"))
+async def start_handler(message: Message):
+    await handle(message)
+
+@dp.message(Command("menu"))
+async def menu_handler(message: Message):
+    uid = uid_of(message)
+    db.ensure_user(uid)
+    await message.answer(db.home_text(uid), reply_markup=MAIN_KB)
+
+@dp.message()
+async def message_handler(message: Message):
+    await handle(message)
+
+async def main():
+    me = await bot.get_me()
+    print(f"T3R0ZA_BOT authenticated as {getattr(me, 'first_name', 'bot')}")
+    print("T3R0ZA_BOT polling started")
+    await dp.start_polling(bot, drop_pending_updates=False)
 
 if __name__ == "__main__":
-    bot.run()
+    threading.Thread(target=start_health_server, daemon=True).start()
+    asyncio.run(main())
