@@ -1,19 +1,30 @@
-# راه‌اندازی خیلی ساده
+# T3R0ZA_BOT
 
-1. Repository همین پروژه را در GitHub باز کن.
-2. Render را باز کن.
-3. New → Web Service را بزن.
-4. Repository به نام T3R0ZA_BOT را انتخاب کن.
-5. Runtime: Python 3
-6. Branch: main
-7. Root Directory: خالی
-8. Build Command: pip install -r requirements.txt
-9. Start Command: python bot.py
-10. Health Check Path: /
-11. در Environment Variables یک مورد بساز:
-   Key = BOT_TOKEN
-   Value = توکن جدید ربات
-12. Deploy را بزن.
-13. بعد در Soroush Plus، ربات را باز کن و /start بفرست.
+ربات رسمی T3R0ZA برای Soroush Plus.
 
-توکن را داخل چت یا GitHub نگذار.
+## وضعیت
+هستهٔ اجرا یکپارچه شده و فقط از API رسمی مستند SplusPy برای Robot، on_message، Message.reply و Button استفاده می‌کند.
+
+## اجرای Render
+- Runtime: Docker
+- Branch: main
+- Root Directory: خالی
+- Build: داخل Dockerfile
+- Start: python bot.py
+- Health Check: /
+
+Environment Variable:
+- BOT_TOKEN = توکن جدید ربات
+
+## امکانات هسته
+- Reply روی پیام کاربر
+- منوی مرحله‌ای
+- بازی، کوئیز، حدس کلمه، واکنش
+- اتاق دو نفره و چندنفره
+- سکهٔ مجازی، XP، Level، Daily Reward، Streak
+- Mission، Achievement، Profile، Leaderboard
+- Shop و Inventory
+- Friends / Pair دوستانه
+- پنل گروه و تنظیمات ضدلینک/ضداسپم/خوش‌آمد
+
+هیچ شرط‌بندی یا پول واقعی در اقتصاد بات وجود ندارد.
