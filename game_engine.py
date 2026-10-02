@@ -20,7 +20,7 @@ class GameEngine:
             ("🌞", "خورشید"),
         ]
 
-    def catalog_text(self):
+    def catalog(self):
         return (
             "🎮 چه بازی‌هایی داریم؟
 
@@ -39,7 +39,7 @@ class GameEngine:
             "🪙 بردها فقط XP و پاداش مجازی داخل بات دارند؛ شرط‌بندی یا پول واقعی وجود ندارد."
         )
 
-    def game_detail(self, kind):
+    def detail(self, kind):
         details = {
             "solo_quiz": (
                 "🎯 کوئیز سریع
@@ -76,7 +76,7 @@ class GameEngine:
 
     def start_solo(self, uid, chat_id, kind):
         self.db.ensure_user(uid)
-        if kind == "solo_quiz":
+        if kind == "quiz":
             q, answer, choices = random.choice(self.questions)
             self.active[(uid, "solo")] = ("quiz", answer, chat_id)
             return (
@@ -92,7 +92,7 @@ class GameEngine:
 جوابت رو همینجا بفرست."
             )
 
-        if kind == "word_game":
+        if kind == "word":
             emoji, answer = random.choice(self.words)
             self.active[(uid, "solo")] = ("word", answer, chat_id)
             return f"🔥 بازی شروع شد!
