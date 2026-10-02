@@ -331,19 +331,58 @@ async def handler(client,event):
         n=norm(text)
 
         if "تروزا" in n or "t3r0za" in n:
-            if any(word in n for word in ("کونی", "احمق", "بی‌عقل")):
-                caller_reply = "😂 بنال داش، تروزا اینجاست."
+            asked = n.replace("t3r0za_bot", " ").replace("t3r0za", " ").replace("تروزا", " ").strip()
+            asked = norm(asked)
+
+            # Keep the user's intent when they call the bot by name.
+            if asked in {"بازی", "گیم"}:
+                await reply_safe(event, "🎮 جان داش؟ بریم بازی 😎", buttons=GAMES)
+                return
+            if asked in {"سکه", "کیف پول"}:
+                await reply_safe(event, wallet(uid), buttons=MAIN)
+                return
+            if asked in {"جایزه", "جایزه روزانه"}:
+                await reply_safe(event, daily(uid), buttons=MAIN)
+                return
+            if asked in {"فروشگاه"}:
+                await reply_safe(event, shop(), buttons=SHOP)
+                return
+            if asked in {"کوله", "کوله‌بری"}:
+                await reply_safe(event, inventory(uid), buttons=SHOP)
+                return
+            if asked in {"پروفایل"}:
+                await reply_safe(event, profile(uid), buttons=MAIN)
+                return
+            if asked in {"رتبه", "رنک"}:
+                await reply_safe(event, leaderboard(), buttons=MAIN)
+                return
+            if asked in {"مأموریت", "ماموریت"}:
+                await reply_safe(event, missions(uid), buttons=MAIN)
+                return
+            if asked in {"افتخارات"}:
+                await reply_safe(event, achievements(uid), buttons=MAIN)
+                return
+            if any(word in n for word in ("احمق", "بی‌عقل")):
+                caller_reply = "😂 آروم داش، تروزا اینجاست."
             elif "سلام" in n:
-                caller_reply = "سلام داش 😎 تروزا اینجاست."
+                caller_reply = random.choice([
+                    "سلام داش 😎 تروزا اینجاست.",
+                    "سلام رفیق 👋 چه خبر؟",
+                    "سلام 😎 بگو ببینم چی تو سرته.",
+                ])
             elif "چطوری" in n or "خوبی" in n:
-                caller_reply = "رو فرمَم داش ⚡ تو چی؟"
+                caller_reply = random.choice([
+                    "رو فرمَم داش ⚡ تو چی؟",
+                    "خوبم رفیق 😎 آماده‌ام.",
+                    "عالی‌ام، بگو چه خبره 👀",
+                ])
             elif "کی هستی" in n or "کی ای" in n:
                 caller_reply = "من T3R0ZA‌م 😎 رفیق سرگرمیِ این جمع."
             else:
                 caller_reply = random.choice([
                     "جان داش؟ 😎",
                     "بنال، تروزا گوشه 👀",
-                    "حواسم هست داش ⚡",
+                    "حواسم هست ⚡",
                     "چی شده؟ بگو 😏",
                 ])
             await reply_safe(event, caller_reply, buttons=MAIN)
