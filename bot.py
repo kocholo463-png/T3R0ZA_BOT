@@ -362,16 +362,16 @@ async def handler(client,event):
                 await reply_safe(event, "✅ جواب درست! 🏆\n✨ +30 XP",buttons=GAMES)
             else:
                 record_game(uid,False)
-                await event.reply(f"❌ جواب درست: {expected}\n✨ +10 XP",buttons=GAMES)
+                await reply_safe(event, f"❌ جواب درست: {expected}\n✨ +10 XP",buttons=GAMES)
             return
 
         room_result=room_answer(uid,chat_id,text)
         if room_result:
-            await event.reply(room_result,buttons=ROOMS)
+            await reply_safe(event, room_result,buttons=ROOMS)
             return
 
         if n in {"بازی","گیم","🎮 بازی"}:
-            await event.reply("""🎮 T3R0ZA GAME CENTER
+            await reply_safe(event, """🎮 T3R0ZA GAME CENTER
 
 چه بازی‌ای بریم؟ 😎
 
@@ -395,7 +395,7 @@ async def handler(client,event):
                 "reaction":"⚡ واکنش\n\nراند کوتاه تمرکز و پاسخ؛ ۱ یا ۲ نفره.",
                 "group":"🏆 چالش گروهی\n\nمسابقه دانستنی برای جمع."
             }[kind]
-            await event.reply(desc+"\n\nحالت بازی رو انتخاب کن 👇",buttons=MODES)
+            await reply_safe(event, desc+"\n\nحالت بازی رو انتخاب کن 👇",buttons=MODES)
             return
 
         if uid in PENDING:
@@ -403,72 +403,72 @@ async def handler(client,event):
             if n in {"👤 تک‌نفره","تک‌نفره","تک نفره"}:
                 if kind=="group":
                     PENDING[uid]=kind
-                    await event.reply("🏆 چالش گروهی حداقل دو نفر می‌خواد.",buttons=MODES)
+                    await reply_safe(event, "🏆 چالش گروهی حداقل دو نفر می‌خواد.",buttons=MODES)
                     return
                 if kind=="quiz":
                     q,a=random.choice(QUESTIONS)
                     ACTIVE[(uid,chat_id)]=a
-                    await event.reply(f"🔥 شروع شد!\n\n❓ {q}\n\nجوابت رو بفرست.",buttons=GAMES)
+                    await reply_safe(event, f"🔥 شروع شد!\n\n❓ {q}\n\nجوابت رو بفرست.",buttons=GAMES)
                 elif kind=="word":
                     em,a=random.choice(WORDS)
                     ACTIVE[(uid,chat_id)]=a
-                    await event.reply(f"🔥 شروع شد!\n\n{em}\n\nاسمش چیه؟",buttons=GAMES)
+                    await reply_safe(event, f"🔥 شروع شد!\n\n{em}\n\nاسمش چیه؟",buttons=GAMES)
                 else:
                     ACTIVE[(uid,chat_id)]="go"
-                    await event.reply("""⚡ تست واکنش
+                    await reply_safe(event, """⚡ تست واکنش
 
 وقتی GO دیدی، سریع بنویس GO.
 """,buttons=GAMES)
                 return
             if n in {"👥 دو نفره","دونفره","دو نفره"}:
-                await event.reply(make_room(uid,chat_id,"duo"),buttons=ROOMS)
+                await reply_safe(event, make_room(uid,chat_id,"duo"),buttons=ROOMS)
                 return
             if n in {"👥👥 چندنفره","چندنفره","چند نفره"}:
-                await event.reply(make_room(uid,chat_id,"multi"),buttons=ROOMS)
+                await reply_safe(event, make_room(uid,chat_id,"multi"),buttons=ROOMS)
                 return
             PENDING[uid]=kind
-            await event.reply("از گزینه‌های بالا یکی رو انتخاب کن 👆",buttons=MODES)
+            await reply_safe(event, "از گزینه‌های بالا یکی رو انتخاب کن 👆",buttons=MODES)
             return
 
         if n in {"سکه","کیف پول","🪙 سکه"}:
-            await event.reply(wallet(uid),buttons=MAIN)
+            await reply_safe(event, wallet(uid),buttons=MAIN)
             return
         if n in {"جایزه","🎁 جایزه","جایزه روزانه"}:
-            await event.reply(daily(uid),buttons=MAIN)
+            await reply_safe(event, daily(uid),buttons=MAIN)
             return
         if n in {"پروفایل","👤 پروفایل"}:
-            await event.reply(profile(uid),buttons=MAIN)
+            await reply_safe(event, profile(uid),buttons=MAIN)
             return
         if n in {"رتبه","🏆 رتبه","رنک"}:
-            await event.reply(leaderboard(),buttons=MAIN)
+            await reply_safe(event, leaderboard(),buttons=MAIN)
             return
         if n in {"افتخارات","⭐ افتخارات"}:
-            await event.reply(achievements(uid),buttons=MAIN)
+            await reply_safe(event, achievements(uid),buttons=MAIN)
             return
         if n in {"مأموریت","ماموریت","🎯 مأموریت"}:
-            await event.reply(missions(uid),buttons=MAIN)
+            await reply_safe(event, missions(uid),buttons=MAIN)
             return
         if n in {"فروشگاه","🛒 فروشگاه"}:
-            await event.reply(shop(),buttons=SHOP)
+            await reply_safe(event, shop(),buttons=SHOP)
             return
         items_by_text={norm("🧰 Lucky Badge"):"badge",norm("🎨 Profile Frame"):"frame",norm("⚡ XP Boost"):"boost"}
         if n in items_by_text:
-            await event.reply(item_detail(items_by_text[n]),buttons=SHOP_ACTIONS)
+            await reply_safe(event, item_detail(items_by_text[n]),buttons=SHOP_ACTIONS)
             return
         if n in {"خرید badge","🛒 خرید badge"}:
-            await event.reply(buy(uid,"badge"),buttons=SHOP)
+            await reply_safe(event, buy(uid,"badge"),buttons=SHOP)
             return
         if n in {"خرید frame","🛒 خرید frame"}:
-            await event.reply(buy(uid,"frame"),buttons=SHOP)
+            await reply_safe(event, buy(uid,"frame"),buttons=SHOP)
             return
         if n in {"خرید boost","🛒 خرید boost"}:
-            await event.reply(buy(uid,"boost"),buttons=SHOP)
+            await reply_safe(event, buy(uid,"boost"),buttons=SHOP)
             return
         if n in {"کوله","🎒 کوله","کوله‌بری"}:
-            await event.reply(inventory(uid),buttons=SHOP)
+            await reply_safe(event, inventory(uid),buttons=SHOP)
             return
         if n in {"پیوستن","➕ پیوستن","join"}:
-            await event.reply(join_room(uid,chat_id),buttons=ROOMS)
+            await reply_safe(event, join_room(uid,chat_id),buttons=ROOMS)
             return
         if n in {"وضعیت اتاق","🔄 وضعیت اتاق"}:
             row=db.execute("SELECT * FROM rooms WHERE chat_id=? AND state!='finished' ORDER BY created_at DESC LIMIT 1",(chat_id,)).fetchone()
@@ -477,40 +477,40 @@ async def handler(client,event):
                 count=db.execute("SELECT COUNT(*) FROM room_players WHERE room_id=?",(row["room_id"],)).fetchone()[0]
                 needed=2 if row["mode"]=="duo" else 3
                 result=f"🎮 اتاق {row['room_id']}\n👥 {count}/{needed}\nوضعیت: {row['state']}"
-            await event.reply(result,buttons=ROOMS)
+            await reply_safe(event, result,buttons=ROOMS)
             return
         if n in {"گروه","🛡️ گروه","پنل","پنل گروه"}:
-            await event.reply(group_panel(chat_id),buttons=GROUP)
+            await reply_safe(event, group_panel(chat_id),buttons=GROUP)
             return
         if n in {"👋 خوش‌آمد","خوش‌آمد"}:
-            await event.reply(toggle_group(chat_id,"welcome"),buttons=GROUP)
+            await reply_safe(event, toggle_group(chat_id,"welcome"),buttons=GROUP)
             return
         if n in {"🔗 ضدلینک","ضدلینک"}:
-            await event.reply(toggle_group(chat_id,"anti_link"),buttons=GROUP)
+            await reply_safe(event, toggle_group(chat_id,"anti_link"),buttons=GROUP)
             return
         if n in {"🚨 ضداسپم","ضداسپم"}:
-            await event.reply(toggle_group(chat_id,"anti_spam"),buttons=GROUP)
+            await reply_safe(event, toggle_group(chat_id,"anti_spam"),buttons=GROUP)
             return
         if n in {"📊 آمار گروه","آمار گروه"}:
             count=db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            await event.reply(f"📊 آمار گروه\n\n👥 کاربران ثبت‌شده: {count}",buttons=GROUP)
+            await reply_safe(event, f"📊 آمار گروه\n\n👥 کاربران ثبت‌شده: {count}",buttons=GROUP)
             return
         if n in {"دوستان","🤝 دوستان","pair"}:
-            await event.reply("🤝 دوستان\n\nبرای Pair دوستانه بنویس: زوج 12345",buttons=MAIN)
+            await reply_safe(event, "🤝 دوستان\n\nبرای Pair دوستانه بنویس: زوج 12345",buttons=MAIN)
             return
         if n.startswith("زوج "):
-            await event.reply(f"🤝 Pair ثبت شد!\n\n{uid} ↔ {n[4:].strip()}",buttons=MAIN)
+            await reply_safe(event, f"🤝 Pair ثبت شد!\n\n{uid} ↔ {n[4:].strip()}",buttons=MAIN)
             return
         if n in {"تنظیمات","⚙️ تنظیمات"}:
-            await event.reply("⚙️ تنظیمات\n\n🌐 فارسی\n😎 لحن خودمونی",buttons=MAIN)
+            await reply_safe(event, "⚙️ تنظیمات\n\n🌐 فارسی\n😎 لحن خودمونی",buttons=MAIN)
             return
         if n in {"کمک","/help","راهنما","help"}:
-            await event.reply("🧠 راهنما\n\nبازی، سکه، جایزه، مأموریت، فروشگاه، کوله، پروفایل، رتبه، افتخارات، دوستان و گروه.",buttons=MAIN)
+            await reply_safe(event, "🧠 راهنما\n\nبازی، سکه، جایزه، مأموریت، فروشگاه، کوله، پروفایل، رتبه، افتخارات، دوستان و گروه.",buttons=MAIN)
             return
-        await event.reply("🤔 اینو کامل نگرفتم 😅\nمثلاً «بازی»، «سکه» یا «فروشگاه» رو بفرست.",buttons=MAIN)
+        await reply_safe(event, "🤔 اینو کامل نگرفتم 😅\nمثلاً «بازی»، «سکه» یا «فروشگاه» رو بفرست.",buttons=MAIN)
     except Exception as exc:
         print(f"T3R0ZA handler error: {type(exc).__name__}: {exc}")
-        try: await event.reply("⚠️ یه خطای موقت خوردیم 😅",buttons=MAIN)
+        try: await reply_safe(event, "⚠️ یه خطای موقت خوردیم 😅",buttons=MAIN)
         except Exception as reply_exc: print(f"reply error: {type(reply_exc).__name__}: {reply_exc}")
 
 if __name__ == "__main__":
