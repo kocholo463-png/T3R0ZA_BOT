@@ -307,25 +307,6 @@ async def reply_safe(event, text_value, buttons=None):
             return await reply_fn(text_value)
     return await reply_fn(text_value)
 
-@bot.on_message(filters.text("/start"))
-async def start_handler(client, event):
-    try:
-        msg = getattr(event, "message", event)
-        uid_value = getattr(event, "sender_id", None) or getattr(msg, "sender_id", None)
-        chat_value = getattr(event, "chat_id", None) or getattr(msg, "chat_id", None)
-        uid = str(uid_value)
-        chat_id = str(chat_value)
-        print(f"T3R0ZA incoming /start uid={uid} chat={chat_id}")
-        ensure_user(uid)
-        add_xp(uid, 5)
-        await reply_safe(event, home(uid), MAIN)
-    except Exception as exc:
-        print(f"T3R0ZA /start error: {type(exc).__name__}: {exc}")
-        try:
-            await reply_safe(event, "⚡ T3R0ZA آنلاین شد؛ یه خطای موقت در منوی اصلی خوردیم.")
-        except Exception as reply_exc:
-            print(f"T3R0ZA /start reply error: {type(reply_exc).__name__}: {reply_exc}")
-
 @bot.on_message()
 async def handler(client,event):
     try:
@@ -349,6 +330,25 @@ async def handler(client,event):
         ensure_user(uid)
         n=norm(text)
 
+        if "تروزا" in n or "t3r0za" in n:
+            if "کونی" in n:
+                caller_reply = "😂 بنال داش، گوشم با توئه."
+            elif "سلام" in n:
+                caller_reply = "سلام داش 😎 تروزا اینجاست."
+            elif "چطوری" in n or "خوبی" in n:
+                caller_reply = "رو فرمَم داش ⚡ تو چی؟"
+            elif "کی هستی" in n or "کی ای" in n:
+                caller_reply = "من T3R0ZA‌م 😎 رفیق سرگرمیِ این جمع."
+            else:
+                caller_reply = random.choice([
+                    "جان داش؟ 😎",
+                    "بنال، تروزا گوشه 👀",
+                    "حواسم هست داش ⚡",
+                    "چی شده؟ بگو 😏",
+                ])
+            await reply_safe(event, caller_reply, buttons=MAIN)
+            return
+
         if n in {"/start","شروع","استارت"}:
             add_xp(uid,5)
             await reply_safe(event, home(uid),buttons=MAIN)
@@ -359,7 +359,7 @@ async def handler(client,event):
             expected=ACTIVE.pop(active_key)
             if norm(text)==norm(expected):
                 record_game(uid,True)
-                await event.reply("✅ جواب درست! 🏆\n✨ +30 XP",buttons=GAMES)
+                await reply_safe(event, "✅ جواب درست! 🏆\n✨ +30 XP",buttons=GAMES)
             else:
                 record_game(uid,False)
                 await event.reply(f"❌ جواب درست: {expected}\n✨ +10 XP",buttons=GAMES)
