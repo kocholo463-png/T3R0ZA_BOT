@@ -331,8 +331,8 @@ async def handler(client,event):
         n=norm(text)
 
         if "تروزا" in n or "t3r0za" in n:
-            if "کونی" in n:
-                caller_reply = "😂 بنال داش، گوشم با توئه."
+            if any(word in n for word in ("کونی", "احمق", "بی‌عقل")):
+                caller_reply = "😂 بنال داش، تروزا اینجاست."
             elif "سلام" in n:
                 caller_reply = "سلام داش 😎 تروزا اینجاست."
             elif "چطوری" in n or "خوبی" in n:
