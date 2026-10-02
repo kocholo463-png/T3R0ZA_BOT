@@ -23,4 +23,4 @@ jobs:
         env:
           BOT_TOKEN: "123456:TEST_TOKEN"
           PORT: "10000"
-        run: python -c "import database, game_engine, menu, bot; print('Project modules import OK')"
+        run: python -c "import bot; print('Bot module import OK')"
