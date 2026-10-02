@@ -4,7 +4,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from spluspy import Robot, filters
+from spluspy import Robot
 
 from database import Database
 from game_engine import GameEngine
@@ -78,7 +78,7 @@ async def reply(event, text, buttons=None):
     msg = getattr(event, "message", event)
     await msg.reply(str(text), buttons=buttons or main_keyboard())
 
-@bot.on_message(filters.text)
+@bot.on_message()
 async def on_message(client, event):
     try:
         text = text_of(event)
@@ -179,7 +179,7 @@ async def on_message(client, event):
                     )
                 return
 
-            if normalized in {"👥 دو نفره", "دونفره", "دو نفره"}:
+            if normalized in {"👥 دو نفره", "دونفره", "دو نفره", "👥 اتاق دو نفره"}:
                 pending_game.pop(uid, None)
                 await reply(
                     event,
@@ -188,7 +188,7 @@ async def on_message(client, event):
                 )
                 return
 
-            if normalized in {"👥👥 چندنفره", "چندنفره", "چند نفره", "مولتی"}:
+            if normalized in {"👥👥 چندنفره", "چندنفره", "چند نفره", "مولتی", "👥👥 اتاق گروهی"}:
                 pending_game.pop(uid, None)
                 if kind in {"quiz", "group_quiz"}:
                     await reply(
