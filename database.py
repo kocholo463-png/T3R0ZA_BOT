@@ -329,6 +329,74 @@ class Database:
             f"🪙 -{item_data['price']} سکه"
         )
 
+    def record_message(self, uid):
+        self.ensure_user(uid)
+        with self.lock, self.conn:
+            self.conn.execute(
+                "UPDATE users SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?", (uid,)
+            )
+
+    def group_settings(self, chat_id):
+        with self.lock, self.conn:
+            self.conn.execute(
+                "CREATE TABLE IF NOT EXISTS group_settings ("
+                "chat_id TEXT PRIMARY KEY, welcome INTEGER NOT NULL DEFAULT 1, "
+                "anti_link INTEGER NOT NULL DEFAULT 0, anti_spam INTEGER NOT NULL DEFAULT 0)"
+            )
+            row = self.conn.execute(
+                "SELECT * FROM group_settings WHERE chat_id=?", (str(chat_id),)
+            ).fetchone()
+            if row is None:
+                self.conn.execute(
+                    "INSERT INTO group_settings(chat_id) VALUES (?)", (str(chat_id),)
+                )
+                row = self.conn.execute(
+                    "SELECT * FROM group_settings WHERE chat_id=?", (str(chat_id),)
+                ).fetchone()
+        return row
+
+    def group_text(self, chat_id):
+        settings = self.group_settings(chat_id)
+        return (
+            "🛡️ T3R0ZA GROUP PANEL\n\n"
+            f"👋 خوش‌آمد: {'روشن' if settings['welcome'] else 'خاموش'}\n"
+            f"🔗 ضدلینک: {'روشن' if settings['anti_link'] else 'خاموش'}\n"
+            f"🚨 ضداسپم: {'روشن' if settings['anti_spam'] else 'خاموش'}\n\n"
+            "از دکمه‌های پایین برای تغییر وضعیت استفاده کن."
+        )
+
+    def toggle_group_setting(self, chat_id, setting):
+        allowed = {"welcome", "anti_link", "anti_spam"}
+        if setting not in allowed:
+            return "❌ تنظیم نامعتبر."
+        current = self.group_settings(chat_id)
+        new_value = 0 if current[setting] else 1
+        with self.lock, self.conn:
+            self.conn.execute(
+                f"UPDATE group_settings SET {setting}=? WHERE chat_id=?",
+                (new_value, str(chat_id)),
+            )
+        names = {
+            "welcome": "👋 خوش‌آمد",
+            "anti_link": "🔗 ضدلینک",
+            "anti_spam": "🚨 ضداسپم",
+        }
+        return f"{names[setting]} {'روشن' if new_value else 'خاموش'} شد."
+
+    def achievements_text(self, uid):
+        row = self.row(uid)
+        achievements = [
+            ("🌱 شروع‌کننده", row["xp"] >= 5),
+            ("🎮 گیمر", row["games_played"] >= 1),
+            ("🏆 برنده", row["games_won"] >= 1),
+            ("🔥 فعال", row["streak"] >= 3),
+            ("⭐ Level 10", row["level"] >= 10),
+        ]
+        lines = ["⭐ افتخارات\n"]
+        for name, unlocked in achievements:
+            lines.append(f"{'✅' if unlocked else '🔒'} {name}")
+        return "\n".join(lines)
+
     def inventory_text(self, uid):
         with self.lock:
             rows = self.conn.execute(
