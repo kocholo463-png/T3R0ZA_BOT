@@ -76,7 +76,7 @@ class GameEngine:
 
     def start_solo(self, uid, chat_id, kind):
         self.db.ensure_user(uid)
-        if kind == "quiz":
+        if kind in {"quiz", "solo_quiz"}:
             q, answer, choices = random.choice(self.questions)
             self.active[(uid, "solo")] = ("quiz", answer, chat_id)
             return (
@@ -92,7 +92,7 @@ class GameEngine:
 جوابت رو همینجا بفرست."
             )
 
-        if kind == "word":
+        if kind in {"word", "word_game"}:
             emoji, answer = random.choice(self.words)
             self.active[(uid, "solo")] = ("word", answer, chat_id)
             return f"🔥 بازی شروع شد!
@@ -223,6 +223,9 @@ class GameEngine:
 "
             "منتظر بقیه‌ایم..."
         )
+
+    def find_room(self, chat_id, waiting=False):
+        return self.find_room_any(chat_id, waiting=waiting)
 
     def find_room_any(self, chat_id, waiting=False):
         query = "SELECT * FROM rooms WHERE chat_id=?"
