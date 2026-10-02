@@ -1,1 +1,1 @@
-aiosplus==0.1.0
+spluspy==2.2.11
