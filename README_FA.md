@@ -28,3 +28,6 @@ Environment Variable:
 - پنل گروه و تنظیمات ضدلینک/ضداسپم/خوش‌آمد
 
 هیچ شرط‌بندی یا پول واقعی در اقتصاد بات وجود ندارد.
+
+
+CI verification trigger: fix /start handler and T3R0ZA mention response.
