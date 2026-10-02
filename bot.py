@@ -242,7 +242,7 @@ def make_room(uid,chat_id,mode):
         old=db.execute("SELECT * FROM rooms WHERE chat_id=? AND state='waiting' ORDER BY created_at DESC LIMIT 1",(str(chat_id),)).fetchone()
         if old:
             count=db.execute("SELECT COUNT(*) FROM room_players WHERE room_id=?",(old["room_id"],)).fetchone()[0]
-            return f"🎮 اتاق فعاله!\n🆔 {old["room_id"]}\n👥 {count}/{needed}\n\n«پیوستن» رو بزن."
+            return f"🎮 اتاق فعاله!\n🆔 {old['room_id']}\n👥 {count}/{needed}\n\n«پیوستن» رو بزن."
         room_id=f"{random.randrange(0x1000000):06X}"
         db.execute("INSERT INTO rooms(room_id,chat_id,mode,host_id) VALUES (?,?,?,?)",(room_id,str(chat_id),mode,uid))
         db.execute("INSERT INTO room_players(room_id,user_id) VALUES (?,?)",(room_id,uid))
@@ -278,7 +278,7 @@ def room_answer(uid,chat_id,text):
     with lock,db:
         db.execute("UPDATE rooms SET state='finished' WHERE room_id=?",(row["room_id"],))
     record_game(uid,True)
-    return f"🏆 برنده: {uid}\n✅ جواب: {row["answer"]}\n✨ +30 XP"
+    return f"🏆 برنده: {uid}\n✅ جواب: {row['answer']}\n✨ +30 XP"
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
