@@ -32,43 +32,72 @@ def start_health_server():
 threading.Thread(target=start_health_server, daemon=True).start()
 
 if not TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set. Add a new token to Render Environment Variables.")
+    raise RuntimeError("BOT_TOKEN is not set. Add it in Render Environment Variables.")
 
 bot = Robot(TOKEN)
 
-def get_message(event):
-    return getattr(event, "message", event)
+def _get_message(event):
+    return getattr(event, "message", None) or event
+
+def _get_value(obj, names):
+    for name in names:
+        try:
+            value = getattr(obj, name, None)
+        except Exception:
+            value = None
+        if value not in (None, ""):
+            return value
+    return None
 
 def get_text(event):
-    msg = get_message(event)
-    return (getattr(msg, "raw_text", None) or getattr(msg, "text", None) or "").strip()
+    msg = _get_message(event)
+    value = _get_value(msg, ("raw_text", "text", "message"))
+    if value is not None:
+        return str(value).strip()
+    value = _get_value(event, ("raw_text", "text", "message"))
+    return str(value).strip() if value is not None else ""
 
 def get_user_id(event):
-    msg = get_message(event)
-    return str(getattr(msg, "sender_id", None) or "unknown")
+    msg = _get_message(event)
+    value = _get_value(msg, ("sender_id", "user_id"))
+    if value is None:
+        value = _get_value(event, ("sender_id", "user_id"))
+    return str(value) if value is not None else "unknown"
 
 def get_chat_id(event):
-    msg = get_message(event)
-    return str(getattr(msg, "chat_id", None) or get_user_id(event))
+    msg = _get_message(event)
+    value = _get_value(msg, ("chat_id",))
+    if value is None:
+        value = _get_value(event, ("chat_id",))
+    return str(value) if value is not None else get_user_id(event)
 
 async def send(event, text, keyboard=None):
     if keyboard is None:
         keyboard = main_keyboard()
-    await event.reply(text, buttons=keyboard)
+    target = event
+    reply = getattr(target, "reply", None)
+    if reply is None:
+        target = _get_message(event)
+        reply = getattr(target, "reply", None)
+    if reply is None:
+        raise RuntimeError("Incoming update has no reply() method.")
+    await reply(str(text), buttons=keyboard)
 
 @bot.on_message()
 async def on_message(client, event):
-    text = get_text(event)
-    if not text:
-        return
-
-    uid = get_user_id(event)
-    cid = get_chat_id(event)
-    db.ensure_user(uid)
-    db.touch_user(uid)
-    normalized = db.normalize(text)
-
     try:
+        text = get_text(event)
+        print(f"T3R0ZA incoming: {text!r}")
+
+        if not text:
+            return
+
+        uid = get_user_id(event)
+        cid = get_chat_id(event)
+        db.ensure_user(uid)
+        db.touch_user(uid)
+        normalized = db.normalize(text)
+
         if normalized in {"/start", "شروع", "استارت"}:
             db.mark_mission(uid, "login")
             db.add_xp(uid, 5)
@@ -124,7 +153,10 @@ async def on_message(client, event):
             await send(event, db.suggest(text))
     except Exception as exc:
         print(f"T3R0ZA update error: {type(exc).__name__}: {exc}")
-        await send(event, "⚠️ یه خطای موقت پیش اومد 😅\nدوباره همین گزینه رو بزن.")
+        try:
+            await send(event, "⚠️ یه خطای موقت پیش اومد 😅\nدوباره /start رو بفرست.")
+        except Exception as reply_exc:
+            print(f"T3R0ZA reply error: {type(reply_exc).__name__}: {reply_exc}")
 
 if __name__ == "__main__":
     bot.run()
